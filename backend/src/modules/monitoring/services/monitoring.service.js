@@ -1,4 +1,5 @@
 const MonitoringRepository = require('../repositories/monitoring.repository');
+const { publishSensorDataReceived } = require('../events/monitoring.events');
 const AppError = require('../../../shared/utils/app-error');
 
 class MonitoringService {
@@ -6,21 +7,42 @@ class MonitoringService {
     this.repository = new MonitoringRepository();
   }
 
-  async recordTelemetry(sensorData) {
-    if (!sensorData || !sensorData.plantId) {
+  async saveTelemetry(data) {
+    if (!data || !data.plantId) {
       throw new AppError('Données de télémétrie invalides', 400);
     }
 
-    return this.repository.createSensorData(sensorData);
+    const sensorData = await this.repository.create(data);
+    publishSensorDataReceived(sensorData);
+
+    return sensorData;
   }
 
-  async getTelemetryHistory(plantId, limit = 100) {
-    if (!plantId || typeof plantId !== 'string') {
-      throw new AppError('Identifiant de plante invalide', 400);
+  async getLatestReading(plantId) {
+    if (!plantId) {
+      throw new AppError('Identifiant de plante manquant', 400);
+    }
+
+    return this.repository.findLatestByPlantId(plantId);
+  }
+
+  async getHistory(plantId, limit = 100) {
+    if (!plantId) {
+      throw new AppError('Identifiant de plante manquant', 400);
     }
 
     const normalizedLimit = Number.isInteger(limit) && limit > 0 ? limit : 100;
-    return this.repository.getHistoryByPlantId(plantId, normalizedLimit);
+    const cappedLimit = Math.min(normalizedLimit, 1000);
+
+    return this.repository.findHistoryByPlantId(plantId, cappedLimit);
+  }
+
+  async deleteHistoryByPlantId(plantId) {
+    if (!plantId) {
+      throw new AppError('Identifiant de plante manquant', 400);
+    }
+
+    return this.repository.deleteByPlantId(plantId);
   }
 }
 

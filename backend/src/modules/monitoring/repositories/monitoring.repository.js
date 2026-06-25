@@ -3,15 +3,20 @@ const mongoose = require('mongoose');
 const sensorDataSchema = new mongoose.Schema(
   {
     plantId: {
-      type: String,
+      type: mongoose.Schema.Types.ObjectId,
       required: true,
       index: true,
+      ref: 'Plant',
     },
     temperature: {
       type: Number,
       required: true,
     },
     humidity: {
+      type: Number,
+      required: true,
+    },
+    soilMoisture: {
       type: Number,
       required: true,
     },
@@ -35,15 +40,25 @@ sensorDataSchema.index({ plantId: 1, createdAt: -1 });
 const SensorDataModel = mongoose.models.SensorData || mongoose.model('SensorData', sensorDataSchema);
 
 class MonitoringRepository {
-  async createSensorData(sensorData) {
-    return SensorDataModel.create(sensorData);
+  async create(data) {
+    return SensorDataModel.create(data);
   }
 
-  async getHistoryByPlantId(plantId, limit = 100) {
+  async findLatestByPlantId(plantId) {
+    return SensorDataModel.findOne({ plantId })
+      .sort({ createdAt: -1 })
+      .lean();
+  }
+
+  async findHistoryByPlantId(plantId, limit = 100) {
     return SensorDataModel.find({ plantId })
       .sort({ createdAt: -1 })
       .limit(limit)
       .lean();
+  }
+
+  async deleteByPlantId(plantId) {
+    return SensorDataModel.deleteMany({ plantId });
   }
 }
 

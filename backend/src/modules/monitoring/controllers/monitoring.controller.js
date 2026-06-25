@@ -1,53 +1,60 @@
 const MonitoringService = require('../services/monitoring.service');
-const { publishSensorDataReceived } = require('../events/monitoring.events');
 const AppError = require('../../../shared/utils/app-error');
 
 const monitoringService = new MonitoringService();
 
 const receiveTelemetry = async (req, res, next) => {
-  try {
-    const telemetry = req.validated;
-    const sensorData = await monitoringService.recordTelemetry(telemetry);
+  const telemetry = req.validated;
+  const sensorData = await monitoringService.saveTelemetry(telemetry);
 
-    publishSensorDataReceived(sensorData);
-
-    res.status(201).json({
-      status: 'success',
-      message: 'Télémétrie enregistrée avec succès',
-      data: sensorData,
-    });
-  } catch (error) {
-    next(error);
-  }
+  res.status(201).json({
+    status: 'success',
+    message: 'Télémétrie enregistrée avec succès',
+    data: sensorData,
+  });
 };
 
 const getHistory = async (req, res, next) => {
-  try {
-    const { plantId } = req.params;
-    if (!plantId) {
-      throw new AppError('Identifiant de plante manquant', 400);
-    }
+  const { plantId } = req.params;
 
-    let limit = Number(req.query.limit) || 100;
-    if (!Number.isInteger(limit) || limit <= 0) {
-      limit = 100;
-    }
-    if (limit > 1000) {
-      limit = 1000;
-    }
-
-    const history = await monitoringService.getTelemetryHistory(plantId, limit);
-
-    res.status(200).json({
-      status: 'success',
-      data: history,
-    });
-  } catch (error) {
-    next(error);
+  if (!plantId) {
+    throw new AppError('Identifiant de plante manquant', 400);
   }
+
+  let limit = req.query.limit ? Number(req.query.limit) : 100;
+  if (!Number.isInteger(limit) || limit <= 0) {
+    limit = 100;
+  }
+
+  const history = await monitoringService.getHistory(plantId, limit);
+
+  res.status(200).json({
+    status: 'success',
+    data: history,
+  });
+};
+
+const getLatest = async (req, res, next) => {
+  const { plantId } = req.params;
+
+  if (!plantId) {
+    throw new AppError('Identifiant de plante manquant', 400);
+  }
+
+  const latest = await monitoringService.getLatestReading(plantId);
+
+  if (!latest) {
+    throw new AppError('Aucune donnée de capteur trouvée pour cette plante', 404);
+  }
+
+  res.status(200).json({
+    status: 'success',
+    data: latest,
+  });
 };
 
 module.exports = {
   receiveTelemetry,
   getHistory,
+  getLatest,
 };
